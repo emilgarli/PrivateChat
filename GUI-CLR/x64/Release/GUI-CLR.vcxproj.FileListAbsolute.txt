@@ -1,0 +1,3 @@
+D:\Source\repos\EncryptedChat\GUI-CLR\x64\Release\GUI-CLR.vcxproj.AssemblyReference.cache
+D:\Source\repos\EncryptedChat\GUI-CLR\x64\Release\GUICLR.ChatGUIForm.resources
+D:\Source\repos\EncryptedChat\GUI-CLR\x64\Release\GUI-CLR.vcxproj.GenerateResource.cache
