@@ -1,7 +1,7 @@
 #pragma once
 //#include <msclr/marshal.h>
 //#include <msclr/marshal_cppstd.h>
-
+#include "Rawsocket.h"
 
 namespace GUICLR {
 
@@ -27,7 +27,9 @@ namespace GUICLR {
 			//
 
 		}
-		static int connectToPeer(const char* ipAddress, int portNum, GUICLR::ChatGUIForm^ form);
+		void writeChat();
+		void readChat();
+		int connectToPeer(const char* ipAddress, int portNum);
 		void logMessage(System::String^ message);
 
 	protected:
@@ -41,6 +43,7 @@ namespace GUICLR {
 				delete components;
 			}
 		}
+	private: CWizReadWriteSocket* socket = nullptr;
 	private: System::Windows::Forms::TextBox^ LogWindow;
 	private: System::Windows::Forms::TextBox^ IpBox;
 	private: System::Windows::Forms::TextBox^ PortBox;
@@ -160,7 +163,7 @@ namespace GUICLR {
 		}
 		this->LogWindow->AppendText("Port number set to " + portNumber + Environment::NewLine);
 		const char* unmanagedString = (const char*)Marshal::StringToHGlobalAnsi(ipAddress).ToPointer();
-		connectToPeer(unmanagedString, portNumber, this);
+		connectToPeer(unmanagedString, portNumber);
 	}
 	}; }
 

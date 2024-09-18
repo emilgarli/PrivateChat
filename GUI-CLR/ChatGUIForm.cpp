@@ -1,5 +1,5 @@
 #include "ChatGUIForm.h"
-#include <Rawsocket.h>
+//#include <thread>
 
 using namespace System::Threading;
 
@@ -9,7 +9,7 @@ using namespace System::Windows::Forms;
 #define MAX_MESSAGE_SIZE 200
 
 // Modify functions to accept a reference to ChatGUIForm
-static void writeChat(CWizReadWriteSocket* socket, GUICLR::ChatGUIForm^ form) {
+void GUICLR::ChatGUIForm::writeChat() {
 	while (true) {
 		string output = "";
 		if (output.length() > MAX_MESSAGE_SIZE) {
@@ -18,12 +18,12 @@ static void writeChat(CWizReadWriteSocket* socket, GUICLR::ChatGUIForm^ form) {
 		socket->Write(output.c_str(), output.length());
 		if (WSAGetLastError() != 0) {
 			// Log an error message
-			form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Unable to write: " + GetLastError());
+			this->logMessage("Unable to write: " + GetLastError());
 		}
 	}
 }
 
-static void readChat(CWizReadWriteSocket* socket, GUICLR::ChatGUIForm^ form)
+void GUICLR::ChatGUIForm::readChat()
 {
 	while (true) {
 		char inBuf[MAX_MESSAGE_SIZE]{};
@@ -33,23 +33,24 @@ static void readChat(CWizReadWriteSocket* socket, GUICLR::ChatGUIForm^ form)
 			Sleep(10);
 		}
 		// Log the received message
-		form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Message received: " + gcnew String(inBuf));
+		this->logMessage("Message received: " + gcnew String(inBuf));
+		//form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Message received: " + gcnew String(inBuf));
 	}
 }
 
+//, GUICLR::ChatGUIForm^ form
+//form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Suq Madiq is my name-o!");
+int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum) {
 
-
-int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum, GUICLR::ChatGUIForm^ form) {
-
-	form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Suq Madiq is my name-o!");
-	CWizReadWriteSocket* socket = new CWizReadWriteSocket();
+	
+	socket = new CWizReadWriteSocket();
 	string peerName = ipAddress;
 
 	if (!socket->Connect(ipAddress, portNum)) {
-		form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Connection failed");
+		this->logMessage("Connect failed");
 	}
 	if (WSAGetLastError() != 0) {
-		form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "WSAGetLastError error");
+		this->logMessage("Error:" + GetLastError());
 		return -1;
 	}
 	if (AllocConsole()) {
@@ -57,12 +58,13 @@ int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum, GUICL
 		freopen_s(&fp, "CONOUT$", "w", stdout);
 	}
 	else {
-		form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Failed to allocate console");
+		this->logMessage("Failed to allocate console");
 		return -1;
 	}
-	// Start the receive thread using a lambda function to pass arguments
-	Thread^ recThread = gcnew Thread(gcnew ParameterizedThreadStart(&readChat, socket, form));
-
+	Thread^ recThread = gcnew Thread(gcnew ThreadStart(this, &GUICLR::ChatGUIForm::readChat));
+	Thread^ writeThread = gcnew Thread(gcnew ThreadStart(this, &GUICLR::ChatGUIForm::writeChat));
+	recThread->Start();
+	writeThread->Start();
 	return 0;
 }
 
