@@ -129,11 +129,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ChatGUIForm.cpp" />
+    <ClCompile Include="ConnectionHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatGUIForm.h">
       <FileType>CppForm</FileType>
     </ClInclude>
+    <ClInclude Include="ConnectionHandler.h" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="ChatGUIForm.resx">

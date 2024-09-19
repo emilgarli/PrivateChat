@@ -18,9 +18,15 @@
     <ClCompile Include="ChatGUIForm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ConnectionHandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatGUIForm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ConnectionHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

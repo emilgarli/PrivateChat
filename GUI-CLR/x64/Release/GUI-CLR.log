@@ -11,8 +11,7 @@ D:\Source\repos\libs\rawsocket\Rawsocket.h(33,9): warning C4005: 'WSAEWOULDBLOCK
 D:\Source\repos\libs\rawsocket\Rawsocket.h(34,9): warning C4005: 'WSAEINPROGRESS': macro redefinition
 D:\Source\repos\libs\rawsocket\Rawsocket.h(35,9): warning C4005: 'WSAEALREADY': macro redefinition
 D:\Source\repos\libs\rawsocket\Rawsocket.h(36,9): warning C4005: 'WSAENOTSOCK': macro redefinition
-D:\Source\repos\EncryptedChat\GUI-CLR\ChatGUIForm.h(161,27): warning C4101: 'ex': unreferenced local variable
-D:\Source\repos\EncryptedChat\GUI-CLR\ChatGUIForm.cpp(18,46): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+D:\Source\repos\EncryptedChat\GUI-CLR\ChatGUIForm.h(190,27): warning C4101: 'ex': unreferenced local variable
   ChatGUIForm.obj : MSIL module encountered; incremental linking is disabled for MSIL; performing full link
   rawsocket.lib(Rawsocket.obj) : MSIL .netmodule or module compiled with /GL found; restarting link with /LTCG; add /LTCG to the link command line to improve linker performance
   Generating code

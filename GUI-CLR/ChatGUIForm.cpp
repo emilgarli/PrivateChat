@@ -1,49 +1,22 @@
 #include "ChatGUIForm.h"
-//#include <thread>
-
-using namespace System::Threading;
-
+#include "ConnectionHandler.h"
+#include "vector"
+#include "thread"
+#include <msclr/marshal_cppstd.h> 
 using namespace System;
 using namespace System::Windows::Forms;
 
-#define MAX_MESSAGE_SIZE 200
+vector<std::shared_ptr<ConnectionHandler>> activeConnections;
 
-// Modify functions to accept a reference to ChatGUIForm
-void GUICLR::ChatGUIForm::writeChat() {
-	while (true) {
-		string output = "";
-		if (output.length() > MAX_MESSAGE_SIZE) {
-			return;
-		}
-		socket->Write(output.c_str(), output.length());
-		if (WSAGetLastError() != 0) {
-			// Log an error message
-			this->logMessage("Unable to write: " + GetLastError());
-		}
-	}
+// Convert System::String^ to std::string
+std::string convertToStdString(System::String^ sysString) {
+	return msclr::interop::marshal_as<std::string>(sysString);
 }
 
-void GUICLR::ChatGUIForm::readChat()
-{
-	while (true) {
-		char inBuf[MAX_MESSAGE_SIZE]{};
-		int iRead = 0;
-		while (iRead < 1) {
-			iRead = socket->Read(inBuf, MAX_MESSAGE_SIZE, 1000);
-			Sleep(10);
-		}
-		// Log the received message
-		this->logMessage("Message received: " + gcnew String(inBuf));
-		//form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Message received: " + gcnew String(inBuf));
-	}
-}
-
-//, GUICLR::ChatGUIForm^ form
-//form->Invoke(gcnew Action<System::String^>(form, &GUICLR::ChatGUIForm::logMessage), "Suq Madiq is my name-o!");
 int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum) {
 
 	
-	socket = new CWizReadWriteSocket();
+	CWizReadWriteSocket* socket = new CWizReadWriteSocket();
 	string peerName = ipAddress;
 
 	if (!socket->Connect(ipAddress, portNum)) {
@@ -61,17 +34,100 @@ int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum) {
 		this->logMessage("Failed to allocate console");
 		return -1;
 	}
-	Thread^ recThread = gcnew Thread(gcnew ThreadStart(this, &GUICLR::ChatGUIForm::readChat));
-	Thread^ writeThread = gcnew Thread(gcnew ThreadStart(this, &GUICLR::ChatGUIForm::writeChat));
-	recThread->Start();
-	writeThread->Start();
+	std::shared_ptr<ConnectionHandler> handler = std::make_shared<ConnectionHandler>(socket, convertToStdString(name));
+	std::thread handlerThread(&ConnectionHandler::connectionRunner, handler);
+	handlerThread.detach();
+	activeConnections.push_back(handler);
 	return 0;
 }
+void GUICLR::ChatGUIForm::listenThread() {
+	//Initialize winsock
+	int iResult;
+	WSADATA wsaData;
+	int portNumber = PRIMARY_PORT;
 
-// Modify logMessage to accept a string parameter
+	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (iResult != 0) {
+		printf("WSAStartup failed: %d\n", iResult);
+		return;
+	}
+	//Create listening socket
+	CWizSyncSocket* serversocket = new CWizSyncSocket(PRIMARY_PORT, SOCK_STREAM);
+
+	if (WSAGetLastError() != 0) {
+		this->logMessage("Unable to bind socket to port " + PRIMARY_PORT);
+		logMessage("Attempting backup listenport " + SECONDARY_PORT);
+		CWizSyncSocket* serversocket = new CWizSyncSocket(SECONDARY_PORT, SOCK_STREAM);
+		portNumber = SECONDARY_PORT;
+	}
+	if (WSAGetLastError() != 0) {
+		logMessage("Failed to bind both ports. Aborting...");
+		portNumber = 0;
+		return;
+	}
+	logMessage("Listening for incomming connections on port " + portNumber);
+	while (true) {
+		SOCKET sock = serversocket->Accept();
+		if (sock == INVALID_SOCKET) {
+			logMessage("Failed to accept incomming connection.");
+			continue;
+		}
+		auto socket = new CWizReadWriteSocket;
+
+		if (WSAGetLastError() != 0) {
+			logMessage("Failed to create new socket");
+			continue;
+		}
+
+		socket->SetSocket(sock);
+		logMessage("Incomming connection!");
+		
+		std::shared_ptr<ConnectionHandler> handler = std::make_shared<ConnectionHandler>(socket, convertToStdString(name));
+		std::thread handlerThread(&ConnectionHandler::connectionRunner, handler);
+		handlerThread.detach();
+		activeConnections.push_back(handler);
+	}
+}
+
+
+
 void GUICLR::ChatGUIForm::logMessage(System::String^ message)
 {
-	this->LogWindow->AppendText(message + Environment::NewLine);
+	// Check if Invoke is required (i.e., if the call is coming from a different thread)
+	if (this->LogWindow->InvokeRequired)
+	{
+		// Create a delegate to point to this function and invoke it on the UI thread
+		this->Invoke(gcnew Action<System::String^>(this, &GUICLR::ChatGUIForm::logMessage), message);
+	}
+	else
+	{
+		// If we're already on the UI thread, append the message directly
+		this->LogWindow->AppendText(message + Environment::NewLine);
+	}
+}
+
+static vector<string> delimitString(const char* buffer, int bufLen, char delimit) {
+	vector<string> vRet; // Use vector<string> to store actual strings
+	string tempChar = "";
+
+	for (int i = 0; i < bufLen; i++) {
+		if (buffer[i] != delimit) {
+			tempChar += buffer[i]; // Append character to tempChar
+		}
+		else {
+			if (!tempChar.empty()) {
+				vRet.push_back(tempChar); // Store the current string in the vector
+				tempChar = ""; // Reset tempChar for the next substring
+			}
+		}
+	}
+
+	// Push the last substring (if any) after the loop
+	if (!tempChar.empty()) {
+		vRet.push_back(tempChar);
+	}
+
+	return vRet; // Return the vector of substrings
 }
 
 int main()

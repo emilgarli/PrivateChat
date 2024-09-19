@@ -1,10 +1,12 @@
 #pragma once
-//#include <msclr/marshal.h>
-//#include <msclr/marshal_cppstd.h>
 #include "Rawsocket.h"
 
-namespace GUICLR {
+#define MAX_MESSAGE_SIZE 200
+#define PRIMARY_PORT 17590
+#define SECONDARY_PORT 17591
 
+namespace GUICLR {
+	using namespace System::Threading;
 	using namespace System;
 	using namespace System::ComponentModel;
 	using namespace System::Collections;
@@ -12,7 +14,7 @@ namespace GUICLR {
 	using namespace System::Data;
 	using namespace System::Drawing;
 	using namespace System::Runtime::InteropServices;
-
+	using namespace System::Collections::Generic;
 	/// <summary>
 	/// Summary for ChatGUIForm
 	/// </summary>
@@ -22,14 +24,15 @@ namespace GUICLR {
 		ChatGUIForm(void)
 		{
 			InitializeComponent();
+			Thread^ listenThread = gcnew Thread(gcnew ThreadStart(this, &GUICLR::ChatGUIForm::listenThread));
+			listenThread->Start();
 			//
 			//TODO: Add the constructor code here
 			//
 
 		}
-		void writeChat();
-		void readChat();
 		int connectToPeer(const char* ipAddress, int portNum);
+		void listenThread();
 		void logMessage(System::String^ message);
 
 	protected:
@@ -43,22 +46,25 @@ namespace GUICLR {
 				delete components;
 			}
 		}
-	private: CWizReadWriteSocket* socket = nullptr;
 	private: System::Windows::Forms::TextBox^ LogWindow;
 	private: System::Windows::Forms::TextBox^ IpBox;
 	private: System::Windows::Forms::TextBox^ PortBox;
-
+	private: String^ name;
 	private: System::Windows::Forms::Button^ SetIP;
 
-	private: System::Windows::Forms::Button^ SetPort;
+	private: System::Windows::Forms::Button^ bSetPort;
 
 	private:
 		/// <summary>
 		/// Required designer variable.
 		/// </summary>
 		System::ComponentModel::Container ^components;
-		String^ ipAddress;
-		int portNumber;
+	private: String^ ipAddress;
+	private: int portNumber;
+	private: System::Windows::Forms::TextBox^ sendtextbox;
+
+	private: System::Windows::Forms::Button^ Sendbutton;
+		   
 
 #pragma region Windows Form Designer generated code
 		/// <summary>
@@ -71,12 +77,14 @@ namespace GUICLR {
 			this->IpBox = (gcnew System::Windows::Forms::TextBox());
 			this->PortBox = (gcnew System::Windows::Forms::TextBox());
 			this->SetIP = (gcnew System::Windows::Forms::Button());
-			this->SetPort = (gcnew System::Windows::Forms::Button());
+			this->bSetPort = (gcnew System::Windows::Forms::Button());
+			this->sendtextbox = (gcnew System::Windows::Forms::TextBox());
+			this->Sendbutton = (gcnew System::Windows::Forms::Button());
 			this->SuspendLayout();
 			// 
 			// LogWindow
 			// 
-			this->LogWindow->Location = System::Drawing::Point(12, 312);
+			this->LogWindow->Location = System::Drawing::Point(12, 244);
 			this->LogWindow->Multiline = true;
 			this->LogWindow->Name = L"LogWindow";
 			this->LogWindow->Size = System::Drawing::Size(1175, 238);
@@ -89,7 +97,7 @@ namespace GUICLR {
 			this->IpBox->Name = L"IpBox";
 			this->IpBox->Size = System::Drawing::Size(162, 20);
 			this->IpBox->TabIndex = 1;
-			this->IpBox->Text = L"Enter IP";
+			this->IpBox->Text = L"127.0.0.1";
 			this->IpBox->TextChanged += gcnew System::EventHandler(this, &ChatGUIForm::IpBox_TextChanged);
 			// 
 			// PortBox
@@ -98,7 +106,7 @@ namespace GUICLR {
 			this->PortBox->Name = L"PortBox";
 			this->PortBox->Size = System::Drawing::Size(119, 20);
 			this->PortBox->TabIndex = 2;
-			this->PortBox->Text = L"Enter Port";
+			this->PortBox->Text = L"17591";
 			this->PortBox->TextChanged += gcnew System::EventHandler(this, &ChatGUIForm::textBox2_TextChanged);
 			// 
 			// SetIP
@@ -113,20 +121,41 @@ namespace GUICLR {
 			// 
 			// SetPort
 			// 
-			this->SetPort->Location = System::Drawing::Point(387, 8);
-			this->SetPort->Name = L"SetPort";
-			this->SetPort->Size = System::Drawing::Size(75, 23);
-			this->SetPort->TabIndex = 4;
-			this->SetPort->Text = L"Set Port";
-			this->SetPort->UseVisualStyleBackColor = true;
-			this->SetPort->Click += gcnew System::EventHandler(this, &ChatGUIForm::button2_Click);
+			this->bSetPort->Location = System::Drawing::Point(387, 8);
+			this->bSetPort->Name = L"SetPort";
+			this->bSetPort->Size = System::Drawing::Size(75, 23);
+			this->bSetPort->TabIndex = 4;
+			this->bSetPort->Text = L"Set Port";
+			this->bSetPort->UseVisualStyleBackColor = true;
+			this->bSetPort->Click += gcnew System::EventHandler(this, &ChatGUIForm::button2_Click);
+			// 
+			// sendtextbox
+			// 
+			this->sendtextbox->Location = System::Drawing::Point(12, 488);
+			this->sendtextbox->Multiline = true;
+			this->sendtextbox->Name = L"sendtextbox";
+			this->sendtextbox->Size = System::Drawing::Size(450, 62);
+			this->sendtextbox->TabIndex = 5;
+			this->sendtextbox->TextChanged += gcnew System::EventHandler(this, &ChatGUIForm::InputBox_TextChanged);
+			// 
+			// Sendbutton
+			// 
+			this->Sendbutton->Location = System::Drawing::Point(469, 489);
+			this->Sendbutton->Name = L"Sendbutton";
+			this->Sendbutton->Size = System::Drawing::Size(81, 61);
+			this->Sendbutton->TabIndex = 6;
+			this->Sendbutton->Text = L"Send";
+			this->Sendbutton->UseVisualStyleBackColor = true;
+			this->Sendbutton->Click += gcnew System::EventHandler(this, &ChatGUIForm::Sendbutton_Click);
 			// 
 			// ChatGUIForm
 			// 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 			this->ClientSize = System::Drawing::Size(1199, 562);
-			this->Controls->Add(this->SetPort);
+			this->Controls->Add(this->Sendbutton);
+			this->Controls->Add(this->sendtextbox);
+			this->Controls->Add(this->bSetPort);
 			this->Controls->Add(this->SetIP);
 			this->Controls->Add(this->PortBox);
 			this->Controls->Add(this->IpBox);
@@ -150,7 +179,7 @@ namespace GUICLR {
 	}
 	private: System::Void button1_Click(System::Object^ sender, System::EventArgs^ e) {
 		ipAddress = this->IpBox->Text;
-		this->LogWindow->AppendText("IP address set to " + ipAddress + Environment::NewLine);
+		this->LogWindow->AppendText("IP address set to \"" + ipAddress + "\"" +  Environment::NewLine);
 	}
 	private: System::Void ChatGUIForm_Load(System::Object^ sender, System::EventArgs^ e) {
 	}
@@ -165,5 +194,11 @@ namespace GUICLR {
 		const char* unmanagedString = (const char*)Marshal::StringToHGlobalAnsi(ipAddress).ToPointer();
 		connectToPeer(unmanagedString, portNumber);
 	}
-	}; }
+	private: System::Void InputBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
+	}
+	private: System::Void Sendbutton_Click(System::Object^ sender, System::EventArgs^ e) {
+		const char* unmanagedString = (const char*)Marshal::StringToHGlobalAnsi(this->sendtextbox->Text).ToPointer();
+		this->sendtextbox->Text = "";
+	}
+}; }
 
