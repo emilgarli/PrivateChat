@@ -1,21 +1,64 @@
+#pragma once
 #include "ChatGUIForm.h"
-#include "ConnectionHandler.h"
 #include "vector"
 #include "thread"
 #include <msclr/marshal_cppstd.h> 
+#include "ConnectionHandler.h"
 using namespace System;
 using namespace System::Windows::Forms;
 
-vector<std::shared_ptr<ConnectionHandler>> activeConnections;
+vector<ConnectionHandler*> activeConnections;
+
 
 // Convert System::String^ to std::string
-std::string convertToStdString(System::String^ sysString) {
-	return msclr::interop::marshal_as<std::string>(sysString);
+std::string GUICLR::ChatGUIForm::convertToStdString(System::String^ sysString) {
+	if (sysString != nullptr && sysString != "")
+		return msclr::interop::marshal_as<std::string>(sysString);
+	else
+		return "";
 }
+
+System::String^ ConvertStdStringToSystemString(const std::string& str) {
+	return gcnew System::String(str.c_str());
+}
+
+void GUICLR::ChatGUIForm::writeMessageToChat(const char* message, int mesLen, string recip) {
+	for (ConnectionHandler* connection : activeConnections) {
+		if (connection->getClientName() == recip) {
+			if (connection->writeToChat(message, mesLen) == mesLen) {
+				logMessage(connection->getName() + ": " + message);
+			}
+		}
+	}
+}
+
+void GUICLR::ChatGUIForm::UpdateConnectionList() {
+	// Check if we need to invoke to the UI thread
+	if (this->listView1->InvokeRequired) {
+		// Create a delegate to call UpdateConnectionList
+		this->listView1->Invoke(gcnew Action(this, &ChatGUIForm::UpdateConnectionList));
+		return;
+	}
+
+	// Clear existing items in the ListView
+	this->listView1->Items->Clear();
+	//Lock the mutex until client name has been read from the connection
+	//Condition variable is used to notify
+
+	for (ConnectionHandler* handler : activeConnections) {
+		// Convert std::string from getName() to System::String^
+		std::string connectionName = handler->getClientName();
+		System::String^ managedName = gcnew System::String(connectionName.c_str());
+
+		// Create a new ListViewItem and add it to the ListView
+		ListViewItem^ item = gcnew ListViewItem(managedName);
+		this->listView1->Items->Add(item);
+	}
+}
+
 
 int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum) {
 
-	
 	CWizReadWriteSocket* socket = new CWizReadWriteSocket();
 	string peerName = ipAddress;
 
@@ -26,21 +69,26 @@ int GUICLR::ChatGUIForm::connectToPeer(const char* ipAddress, int portNum) {
 		this->logMessage("Error:" + GetLastError());
 		return -1;
 	}
-	if (AllocConsole()) {
-		FILE* fp;
-		freopen_s(&fp, "CONOUT$", "w", stdout);
-	}
-	else {
-		this->logMessage("Failed to allocate console");
-		return -1;
-	}
-	std::shared_ptr<ConnectionHandler> handler = std::make_shared<ConnectionHandler>(socket, convertToStdString(name));
+	//std::shared_ptr<ConnectionHandler> handler = std::make_shared<ConnectionHandler>(socket, convertToStdString(name));
+	ConnectionHandler* handler = new ConnectionHandler(socket, convertToStdString(name));
+	handler->setManagedObject(this);
 	std::thread handlerThread(&ConnectionHandler::connectionRunner, handler);
 	handlerThread.detach();
 	activeConnections.push_back(handler);
+
+	char inBuf[20]{};
+	int iRead = 0;
+	while (iRead == 0) {
+		socket->Read(inBuf, 20, 1000);
+	}
+
+	handler->setClientName((string)inBuf);
+	UpdateConnectionList();
 	return 0;
 }
 void GUICLR::ChatGUIForm::listenThread() {
+	//Wait a little while so the controls can be created
+	Sleep(500);
 	//Initialize winsock
 	int iResult;
 	WSADATA wsaData;
@@ -72,7 +120,7 @@ void GUICLR::ChatGUIForm::listenThread() {
 			logMessage("Failed to accept incomming connection.");
 			continue;
 		}
-		auto socket = new CWizReadWriteSocket;
+		CWizReadWriteSocket* socket = new CWizReadWriteSocket;
 
 		if (WSAGetLastError() != 0) {
 			logMessage("Failed to create new socket");
@@ -80,19 +128,43 @@ void GUICLR::ChatGUIForm::listenThread() {
 		}
 
 		socket->SetSocket(sock);
-		logMessage("Incomming connection!");
-		
-		std::shared_ptr<ConnectionHandler> handler = std::make_shared<ConnectionHandler>(socket, convertToStdString(name));
+		logMessage("Incomming connection accepted");
+		ConnectionHandler* handler = new ConnectionHandler(socket, convertToStdString(name));
+		handler->setManagedObject(this);
 		std::thread handlerThread(&ConnectionHandler::connectionRunner, handler);
 		handlerThread.detach();
 		activeConnections.push_back(handler);
+
+		char inBuf[20]{};
+		int iRead = 0;
+		while (iRead == 0) {
+			//Why does recv work, but not Read????
+			iRead = socket->Read(inBuf, 20, 1000);
+			iRead = recv(socket->H(), inBuf, 20, 0);
+		}
+
+		handler->setClientName((string)inBuf);
+		UpdateConnectionList();
 	}
 }
 
-
-
 void GUICLR::ChatGUIForm::logMessage(System::String^ message)
 {
+	// Check if Invoke is required (i.e., if the call is coming from a different thread)
+	if (this->LogWindow->InvokeRequired)
+	{
+		// Create a delegate to point to this function and invoke it on the UI thread
+		this->Invoke(gcnew Action<System::String^>(this, &GUICLR::ChatGUIForm::logMessage), message);
+	}
+	else
+	{
+		// If we're already on the UI thread, append the message directly
+		this->LogWindow->AppendText(message + Environment::NewLine);
+	}
+}
+void GUICLR::ChatGUIForm::logMessage(std::string stdmessage)
+{
+	System::String^ message = ConvertStdStringToSystemString(stdmessage);
 	// Check if Invoke is required (i.e., if the call is coming from a different thread)
 	if (this->LogWindow->InvokeRequired)
 	{

@@ -1,5 +1,4 @@
 #pragma once
-#include "Rawsocket.h"
 #include "ChatGUIForm.h"
 #include "vcclr.h"
 
@@ -12,14 +11,19 @@ public:
 	//Reads the socket and returns the message
 	int readFromChat(char* buffer, int bufLen);
 
+	int readHandler();
+
 	string getClientName() { return clientName; }
-	void setManagedObject(GUICLR::ChatGUIForm^ managedObj) { form = managedObj; }
 	string getName() { return name; }
 
+	void setManagedObject(GUICLR::ChatGUIForm^ managedObj) { form = managedObj; }
+	void setClientName(string newClientName) { clientName = newClientName; }
+
 	int connectionRunner();
+
 private:
 	gcroot<GUICLR::ChatGUIForm^> form;
 	CWizReadWriteSocket* socket = nullptr;
 	string name = "";
-	string clientName = "";
+	string clientName = "Default name";
 };

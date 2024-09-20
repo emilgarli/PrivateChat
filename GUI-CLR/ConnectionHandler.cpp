@@ -1,5 +1,6 @@
 #include "ConnectionHandler.h"
 #include "vector"
+#include "thread"
 
 static vector<string> delimitString(const char* buffer, int bufLen, char delimit) {
 	vector<string> vRet; // Use vector<string> to store actual strings
@@ -28,6 +29,7 @@ static vector<string> delimitString(const char* buffer, int bufLen, char delimit
 ConnectionHandler::ConnectionHandler(CWizReadWriteSocket* sock,  string name)
 {
 	socket = sock;
+	this->name = name;
 }
 
 int ConnectionHandler::writeToChat(const char* message, int messageLength)
@@ -38,19 +40,36 @@ int ConnectionHandler::writeToChat(const char* message, int messageLength)
 
 int ConnectionHandler::readFromChat(char* buffer, int bufLen)
 {
-	int iRead = 0;
-	while (iRead == 0) {
-		iRead = socket->Read(buffer, bufLen, 1000);
+	while (true) {
+		int iRead = 0;
+		while (iRead == 0) {
+			//iRead = recv(socket->H(), buffer, bufLen, 0);
+			iRead = socket->Read(buffer, bufLen, 100);
+			Sleep(50);
+		}
 	}
-	return iRead;
+	return 0;
+}
+
+int ConnectionHandler::readHandler() {
+	char inBuffer[MAX_MESSAGE_SIZE]{};
+	while (true) {
+		int iRead = 0;
+		iRead = readFromChat(inBuffer, MAX_MESSAGE_SIZE);
+		if (iRead > 0) {
+			System::String^ message = gcnew System::String(inBuffer);
+			form->logMessage(message);
+		}
+	}
 }
 
 int ConnectionHandler::connectionRunner()
 {
-	char infoBuffer[MAX_MESSAGE_SIZE]{};
-	int iRead = readFromChat(infoBuffer, MAX_MESSAGE_SIZE);
-	vector<string> infoVec = delimitString(infoBuffer, MAX_MESSAGE_SIZE, ',');
-	clientName = infoVec.at(0);
+	thread readThread(&ConnectionHandler::readHandler, this);
+	readThread.detach();  // Make sure the thread runs independently
+
 	return 0;
 }
+
+
 
